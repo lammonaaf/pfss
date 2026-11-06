@@ -1,0 +1,15 @@
+require('dotenv').config();
+
+function required(name) {
+	const value = process.env[name];
+	if (!value) {
+		throw new Error(`Missing ${name}. Copy .env.example to .env and fill it in.`);
+	}
+	return value;
+}
+
+module.exports = {
+	token: required('DISCORD_TOKEN'),
+	clientId: required('DISCORD_CLIENT_ID'),
+	guildId: process.env.DISCORD_GUILD_ID || null,
+};
