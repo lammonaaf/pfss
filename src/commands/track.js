@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { parseTrackerCommands } = require('pf2e-sage-stats');
 const {
 	editedTracker,
+	normalizeInstructions,
 	enqueue,
 	findLatestTracker,
 	isTrackerParseError,
@@ -38,7 +39,7 @@ module.exports = {
 				.setRequired(false),
 		),
 	async execute(interaction) {
-		const line = interaction.options.getString('instructions', true);
+		const line = normalizeInstructions(interaction.options.getString('instructions', true));
 		const asNew = interaction.options.getBoolean('new') ?? false;
 
 		if (parseTrackerCommands(line).length === 0) {

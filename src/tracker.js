@@ -95,8 +95,27 @@ async function textChannel(interaction) {
 	return channel;
 }
 
+const CURLY_QUOTES = /[“”„‟«»＂〝〞〟]/g;
+
+function normalizeInstructions(line) {
+	const quoted = line.replace(CURLY_QUOTES, '"').replace(/\\"/g, '"');
+
+	const withSingleQuotes = quoted.replace(
+		/(^|\s)([^\s="+-]+)(\s*)(\+\+|--|\+|-|=)\s*['‘’]([^'‘’]*)['‘’]/g,
+		'$1$2$3$4"$5"',
+	);
+
+	return withSingleQuotes.replace(
+		/(^|\s)([^\s="+-]+)(\s*)(\+\+(?!")|--(?!")|\+(?![+"])|-(?![-"])|=(?!"))(\S+)/g,
+		(full, lead, tag, space, op, value) => {
+			if ((op === '+' || op === '-') && /^\d+$/.test(value)) return full;
+			return `${lead}${tag}${space}${op}"${value}"`;
+		},
+	);
+}
+
 function editedTracker(tracker, line) {
-	const actions = parseTrackerCommands(line);
+	const actions = parseTrackerCommands(normalizeInstructions(line));
 	if (actions.length === 0) return null;
 	return applyTrackerCommands(tracker, actions).tracker;
 }
@@ -104,6 +123,7 @@ function editedTracker(tracker, line) {
 module.exports = {
 	TRACKER_FILE,
 	editedTracker,
+	normalizeInstructions,
 	enqueue,
 	findLatestTracker,
 	isTrackerParseError,
