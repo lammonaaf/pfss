@@ -98,20 +98,7 @@ async function textChannel(interaction) {
 const CURLY_QUOTES = /[“”„‟«»＂〝〞〟]/g;
 
 function normalizeInstructions(line) {
-	const quoted = line.replace(CURLY_QUOTES, '"').replace(/\\"/g, '"');
-
-	const withSingleQuotes = quoted.replace(
-		/(^|\s)([^\s="+-]+)(\s*)(\+\+|--|\+|-|=)\s*['‘’]([^'‘’]*)['‘’]/g,
-		'$1$2$3$4"$5"',
-	);
-
-	return withSingleQuotes.replace(
-		/(^|\s)([^\s="+-]+)(\s*)(\+\+(?!")|--(?!")|\+(?![+"])|-(?![-"])|=(?!"))(\S+)/g,
-		(full, lead, tag, space, op, value) => {
-			if ((op === '+' || op === '-') && /^\d+$/.test(value)) return full;
-			return `${lead}${tag}${space}${op}"${value}"`;
-		},
-	);
+	return line.replace(CURLY_QUOTES, '"').replace(/\\"/g, '"');
 }
 
 function editedTracker(tracker, line) {

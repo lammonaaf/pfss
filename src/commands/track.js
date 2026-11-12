@@ -84,12 +84,12 @@ module.exports = {
 
 				if (asNew) {
 					await channel.send(payload);
-					await interaction.editReply({ content: 'Posted a new tracker.' });
+					await interaction.deleteReply();
 					return;
 				}
 
 				await message.edit({ ...payload, attachments: [] });
-				await interaction.editReply({ content: 'Updated the tracker.' });
+				await interaction.deleteReply();
 			} catch (error) {
 				const content = failureContent(error);
 				if (!content) throw error;
