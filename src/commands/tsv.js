@@ -41,8 +41,16 @@ module.exports = {
 		const stats = parseJSON(contents);
 		const tsv = formatTSV(stats, secret, includeDefault);
 
-		await interaction.editReply({
+		const message = await interaction.editReply({
 			files: [new AttachmentBuilder(Buffer.from(tsv), { name: stats.alias + '.tsv' })],
 		});
+
+		const attachmentUrl = message.attachments.first()?.url;
+
+		if (attachmentUrl) {
+			await interaction.editReply({
+				content: `[Direct link](${attachmentUrl})`,
+			});
+		}
 	},
 };
