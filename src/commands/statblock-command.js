@@ -25,15 +25,21 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('statblock-command')
 		.setDescription('Accept pf2e statblock text and formats it into Sage\'s create command.')
+		.addAttachmentOption((option) =>
+			option.setName('file').setDescription('A .txt statblock file').setRequired(false).setFileTypes('.txt'),
+		)
 		.addStringOption((option) =>
 			option
 				.setName('text')
 				.setDescription('The statblock text.')
-				.setRequired(true)
+				.setRequired(false)
 				.setMaxLength(6000),
 		)
 		.addStringOption((option) =>
 			option.setName('alias').setDescription('Creature alias.').setRequired(false),
+		)
+		.addStringOption((option) =>
+			option.setName('bump').setDescription('PFS level bumps, comma separated').setRequired(false)
 		)
 		.addBooleanOption((option) =>
 			option.setName('default').setDescription('Include values for untrained skills.').setRequired(false),
@@ -42,15 +48,59 @@ module.exports = {
 			option.setName('secret').setDescription('Include secret DCs.').setRequired(false),
 		),
 	async execute(interaction) {
-		const text = interaction.options.getString('text', true);
+		const attachment = interaction.options.getAttachment('file') ?? null;
+		const text = interaction.options.getString('text') ?? null;
 		const alias = interaction.options.getString('alias') ?? null;
+		const bump = interaction.options.getString('bump') ?? null;
 		const includeDefault = interaction.options.getBoolean('default') ?? false;
 		const secret = interaction.options.getBoolean('secret') ?? false;
-		const stats = parseStatblock(null, text, alias);
+
+		const bumps = bump?.split(',').map((b) => b.trim().toLowerCase()) ?? [];
+
+		let contents = null;
+
+		if (attachment) {
+			const name = attachment.name ?? 'file.json';
+
+			if (!name.toLowerCase().endsWith('.txt')) {
+				await interaction.reply({
+					content: 'Attach a file with a `.txt` extension.',
+					ephemeral: true,
+				});
+				return;
+			}
+
+			await interaction.deferReply();
+
+			const response = await fetch(attachment.url);
+			if (!response.ok) {
+				await interaction.editReply({ content: 'Could not download that file.' });
+				return;
+			}
+
+			contents = await response.text();
+		} else if (text) {
+			await interaction.deferReply();
+			contents = text;
+		} else {
+			await interaction.editReply({ content: 'You should provide the statblock.' });
+			return;
+		}
+
+		const stats = parseStatblock(null, contents, alias, {
+			default: bumps.length > 0 ? 1 : 0,
+			attack: bumps.includes('attack') ? 2 : undefined,
+			ac: bumps.includes('ac') ? 2 : undefined,
+			saves: bumps.includes('saves') ? 2 : undefined,
+			skills: bumps.includes('skills') ? 2 : undefined,
+			spells: bumps.includes('spells') ? 2 : undefined,
+			perception: bumps.includes('perception') ? 2 : undefined,
+		});
+
 		const command = formatCommand(stats, secret, includeDefault);
 		const [first, ...rest] = codeBlockMessages(command);
 
-		await interaction.reply({ content: first });
+		await interaction.editReply({ content: first });
 		for (const content of rest) {
 			await interaction.followUp({ content });
 		}

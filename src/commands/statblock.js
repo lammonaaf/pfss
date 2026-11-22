@@ -1,76 +1,75 @@
 const { AttachmentBuilder, SlashCommandBuilder } = require('discord.js');
 const { parseStatblock, formatJSON } = require('pf2e-sage-stats');
 
-// attack: zod.coerce.number().optional(),
-// ac: zod.coerce.number().optional(),
-// saves: zod.coerce.number().optional(),
-// skills: zod.coerce.number().optional(),
-// spells: zod.coerce.number().optional(),
-// perception: zod.coerce.number().optional(),
-// hp: zod.coerce.number().optional(),
-
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('statblock')
 		.setDescription('Accept pf2e statblock text and extracts it into json.')
+		.addAttachmentOption((option) =>
+			option.setName('file').setDescription('A .txt statblock file').setRequired(false).setFileTypes('.txt'),
+		)
 		.addStringOption((option) =>
 			option
 				.setName('text')
 				.setDescription('The statblock text.')
-				.setRequired(true)
+				.setRequired(false)
 				.setMaxLength(6000),
 		)
 		.addStringOption((option) =>
 			option.setName('alias').setDescription('Creature alias.').setRequired(false),
 		)
-		.addNumberOption((option) =>
-			option.setName('default-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('attack-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('ac-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('saves-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('skills-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('spells-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('perception-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('hp-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
+		.addStringOption((option) =>
+			option.setName('bump').setDescription('PFS level bumps, comma separated').setRequired(false)
 		),
 	async execute(interaction) {
-		const text = interaction.options.getString('text', true);
+		const attachment = interaction.options.getAttachment('file') ?? null;
+		const text = interaction.options.getString('text') ?? null;
 		const alias = interaction.options.getString('alias') ?? null;
-		const defaultBump = interaction.options.getNumber('default-bump') ?? 0;
-		const attackBump = interaction.options.getNumber('attack-bump') ?? undefined;
-		const acBump = interaction.options.getNumber('ac-bump') ?? undefined;
-		const savesBump = interaction.options.getNumber('saves-bump') ?? undefined;
-		const skillsBump = interaction.options.getNumber('skills-bump') ?? undefined;
-		const spellsBump = interaction.options.getNumber('spells-bump') ?? undefined;
-		const perceptionBump = interaction.options.getNumber('perception-bump') ?? undefined;
-		const hpBump = interaction.options.getNumber('hp-bump') ?? undefined;
+		const bump = interaction.options.getString('bump') ?? null;
 
-		const stats = parseStatblock(null, text, alias, {
-			default: defaultBump,
-			attack: attackBump,
-			ac: acBump,
-			saves: savesBump,
-			skills: skillsBump,
-			spells: spellsBump,
-			perception: perceptionBump,
-			hp: hpBump,
+		const bumps = bump?.split(',').map((b) => b.trim().toLowerCase()) ?? [];
+
+		let contents = null;
+
+		if (attachment) {
+			const name = attachment.name ?? 'file.json';
+
+			if (!name.toLowerCase().endsWith('.txt')) {
+				await interaction.reply({
+					content: 'Attach a file with a `.txt` extension.',
+					ephemeral: true,
+				});
+				return;
+			}
+
+			await interaction.deferReply();
+
+			const response = await fetch(attachment.url);
+			if (!response.ok) {
+				await interaction.editReply({ content: 'Could not download that file.' });
+				return;
+			}
+
+			contents = await response.text();
+		} else if (text) {
+			await interaction.deferReply();
+			contents = text;
+		} else {
+			await interaction.editReply({ content: 'You should provide the statblock.' });
+			return;
+		}
+
+		const stats = parseStatblock(null, contents, alias, {
+			default: bumps.length > 0 ? 1 : 0,
+			attack: bumps.includes('attack') ? 2 : undefined,
+			ac: bumps.includes('ac') ? 2 : undefined,
+			saves: bumps.includes('saves') ? 2 : undefined,
+			skills: bumps.includes('skills') ? 2 : undefined,
+			spells: bumps.includes('spells') ? 2 : undefined,
+			perception: bumps.includes('perception') ? 2 : undefined,
 		});
 
-		await interaction.reply({
+		await interaction.editReply({
 			files: [new AttachmentBuilder(Buffer.from(formatJSON(stats)), { name: stats.alias + '.json' })],
 		});
 	},
