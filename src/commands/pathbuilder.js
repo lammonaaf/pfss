@@ -6,76 +6,86 @@ module.exports = {
 		.setName('pathbuilder')
 		.setDescription('Accept pathbuilder json and extracts it into character json.')
 		.addAttachmentOption((option) =>
-			option.setName('file').setDescription('A .json pathbuilder file').setRequired(true).setFileTypes('.json'),
+			option.setName('file').setDescription('A .json pathbuilder file').setRequired(false).setFileTypes('.json'),
+		)
+		.addStringOption((option) =>
+			option
+				.setName('text')
+				.setDescription('The json text.')
+				.setRequired(false)
+				.setMaxLength(6000),
+		)
+		.addStringOption((option) =>
+			option
+				.setName('id')
+				.setDescription('The pathbuilder json id.')
+				.setRequired(false)
+				.setMaxLength(40),
 		)
 		.addStringOption((option) =>
 			option.setName('alias').setDescription('Creature alias.').setRequired(false),
 		)
-		.addNumberOption((option) =>
-			option.setName('default-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('attack-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('ac-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('saves-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('skills-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('spells-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('perception-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
-		)
-		.addNumberOption((option) =>
-			option.setName('hp-bump').setDescription('PFS level bump, typically 0 or 2').setRequired(false)
+		.addStringOption((option) =>
+			option.setName('bump').setDescription('PFS level bumps, comma separated').setRequired(false)
 		),
 	async execute(interaction) {
-		const attachment = interaction.options.getAttachment('file', true);
+		const attachment = interaction.options.getAttachment('file') ?? null;
+		const text = interaction.options.getString('text') ?? null;
+		const id = interaction.options.getString('id') ?? null;
 		const alias = interaction.options.getString('alias') ?? null;
-		const defaultBump = interaction.options.getNumber('default-bump') ?? 0;
-		const attackBump = interaction.options.getNumber('attack-bump') ?? undefined;
-		const acBump = interaction.options.getNumber('ac-bump') ?? undefined;
-		const savesBump = interaction.options.getNumber('saves-bump') ?? undefined;
-		const skillsBump = interaction.options.getNumber('skills-bump') ?? undefined;
-		const spellsBump = interaction.options.getNumber('spells-bump') ?? undefined;
-		const perceptionBump = interaction.options.getNumber('perception-bump') ?? undefined;
-		const hpBump = interaction.options.getNumber('hp-bump') ?? undefined;
+		const bump = interaction.options.getString('bump') ?? null;
 
-		const name = attachment.name ?? 'file.json';
+		const bumps = bump?.split(',').map((b) => b.trim().toLowerCase()) ?? [];
 
-		if (!name.toLowerCase().endsWith('.json')) {
-			await interaction.reply({
-				content: 'Attach a file with a `.json` extension.',
-				ephemeral: true,
-			});
+		let contents = null;
+
+		if (attachment) {
+			const name = attachment.name ?? 'file.json';
+
+			if (!name.toLowerCase().endsWith('.json')) {
+				await interaction.reply({
+					content: 'Attach a file with a `.json` extension.',
+					ephemeral: true,
+				});
+				return;
+			}
+
+			await interaction.deferReply();
+
+			const response = await fetch(attachment.url);
+			if (!response.ok) {
+				await interaction.editReply({ content: 'Could not download that file.' });
+				return;
+			}
+
+			contents = await response.text();
+		} else if (text) {
+			await interaction.deferReply();
+			contents = text;
+		} else if (id) {
+			await interaction.deferReply();
+
+			const response = await fetch(`https://pathbuilder2e.com/json.php?id=${id}`);
+			if (!response.ok) {
+				console.log(response)
+				await interaction.editReply({ content: 'Could not download the file.' });
+				return;
+			}
+
+			contents = await response.text();
+		} else {
+			await interaction.editReply({ content: 'You should provide the json.' });
 			return;
 		}
-
-		await interaction.deferReply();
-
-		const response = await fetch(attachment.url);
-		if (!response.ok) {
-			await interaction.editReply({ content: 'Could not download that file.' });
-			return;
-		}
-
-		const contents = await response.text();
 
 		const stats = parsePathbuilder(contents, alias, {
-			default: defaultBump,
-			attack: attackBump,
-			ac: acBump,
-			saves: savesBump,
-			skills: skillsBump,
-			spells: spellsBump,
-			perception: perceptionBump,
-			hp: hpBump,
+			default: bumps.length > 0 ? 1 : 0,
+			attack: bumps.includes('attack') ? 2 : undefined,
+			ac: bumps.includes('ac') ? 2 : undefined,
+			saves: bumps.includes('saves') ? 2 : undefined,
+			skills: bumps.includes('skills') ? 2 : undefined,
+			spells: bumps.includes('spells') ? 2 : undefined,
+			perception: bumps.includes('perception') ? 2 : undefined,
 		});
 
 		await interaction.editReply({
