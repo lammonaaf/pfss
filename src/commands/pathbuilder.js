@@ -6,7 +6,7 @@ module.exports = {
 		.setName('pathbuilder')
 		.setDescription('Accept pathbuilder json and extracts it into character json.')
 		.addAttachmentOption((option) =>
-			option.setName('file').setDescription('A .json pathbuilder file').setRequired(false).setFileTypes('.json'),
+			option.setName('file').setDescription('A .json pathbuilder file').setRequired(false).setFileTypes('.json', '.txt'),
 		)
 		.addStringOption((option) =>
 			option
@@ -42,9 +42,9 @@ module.exports = {
 		if (attachment) {
 			const name = attachment.name ?? 'file.json';
 
-			if (!name.toLowerCase().endsWith('.json')) {
+			if (!name.toLowerCase().endsWith('.json') && !name.toLowerCase().endsWith('.txt')) {
 				await interaction.reply({
-					content: 'Attach a file with a `.json` extension.',
+					content: 'Attach a file with a `.json` or `.txt` extension.',
 					ephemeral: true,
 				});
 				return;
