@@ -89,10 +89,10 @@ module.exports = {
 
 		const stats = parseStatblock(null, contents, alias, bumps.includes('elite') ? {
 			level: 1,
-			deafult: 2,
+			default: 2,
 		} : bumps.includes('weak') ? {
 			level: -1,
-			deafult: -2,
+			default: -2,
 		} : {
 			default: bumps.length > 0 ? 1 : 0,
 			attack: bumps.includes('attack') ? 2 : undefined,
