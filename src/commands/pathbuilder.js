@@ -78,7 +78,13 @@ module.exports = {
 			return;
 		}
 
-		const stats = parsePathbuilder(contents, alias, {
+		const stats = parsePathbuilder(contents, alias, bumps.includes('elite') ? {
+			level: 1,
+			deafult: 2,
+		} : bumps.includes('weak') ? {
+			level: -1,
+			deafult: -2,
+		} : {
 			default: bumps.length > 0 ? 1 : 0,
 			attack: bumps.includes('attack') ? 2 : undefined,
 			ac: bumps.includes('ac') ? 2 : undefined,
