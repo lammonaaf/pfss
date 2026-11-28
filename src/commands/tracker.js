@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { parseTracker } = require('pf2e-sage-stats');
-const { enqueue, isTrackerParseError, textChannel, trackerMessage } = require('../tracker');
+const { enqueue, isTrackerParseError, sendTrackerMessages, textChannel } = require('../tracker');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -50,13 +50,9 @@ module.exports = {
 				throw error;
 			}
 
-			const payload = await trackerMessage(tracker, interaction);
-			if (payload.error) {
-				await interaction.editReply({ content: payload.error });
-				return;
-			}
-
-			await interaction.editReply(payload);
+			await sendTrackerMessages(channel, tracker, interaction);
+			await interaction.deleteReply();
+			return;
 		});
 	},
 };

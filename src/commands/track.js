@@ -1,14 +1,15 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { parseTrackerCommands } = require('pf2e-sage-stats');
 const {
+	editTrackerGroup,
 	editedTracker,
-	normalizeInstructions,
 	enqueue,
-	findLatestTracker,
+	findLatestTrackerGroup,
 	isTrackerParseError,
+	normalizeInstructions,
 	readTrackerMessage,
+	sendTrackerMessages,
 	textChannel,
-	trackerMessage,
 } = require('../tracker');
 
 function failureContent(error) {
@@ -64,31 +65,32 @@ module.exports = {
 
 		await enqueue(channel.id, async () => {
 			try {
-				const message = await findLatestTracker(channel, interaction.client.user.id);
-				if (!message) {
+				const group = await findLatestTrackerGroup(channel, interaction.client.user.id);
+				if (!group) {
 					await interaction.editReply({ content: 'No tracker in this channel.' });
 					return;
 				}
 
-				const tracker = editedTracker(await readTrackerMessage(message), line);
+				// The JSON file is always on the last message in the group
+				const anchorMessage = group.at(-1);
+				const tracker = editedTracker(await readTrackerMessage(anchorMessage), line);
 				if (!tracker) {
 					await interaction.editReply({ content: 'Those instructions did not match any tracker edits.' });
 					return;
 				}
 
-				const payload = await trackerMessage(tracker, interaction);
-				if (payload.error) {
-					await interaction.editReply({ content: payload.error });
-					return;
-				}
-
 				if (asNew) {
-					await channel.send(payload);
+					await sendTrackerMessages(channel, tracker, interaction);
 					await interaction.deleteReply();
 					return;
 				}
 
-				await message.edit({ ...payload, attachments: [] });
+				const result = await editTrackerGroup(group, tracker, interaction);
+				if (result.error) {
+					await interaction.editReply({ content: result.error });
+					return;
+				}
+
 				await interaction.deleteReply();
 			} catch (error) {
 				const content = failureContent(error);
