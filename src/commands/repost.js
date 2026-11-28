@@ -1,5 +1,5 @@
-const { AttachmentBuilder, ChannelType, SlashCommandBuilder } = require('discord.js');
-const { enqueue, findLatestTracker, textChannel, TRACKER_FILE } = require('../tracker');
+const { ChannelType, SlashCommandBuilder } = require('discord.js');
+const { enqueue, findLatestTrackerGroup, textChannel, readTrackerMessage, sendTrackerMessages } = require('../tracker');
 
 const DESTINATION_TYPES = [
 	ChannelType.GuildText,
@@ -35,27 +35,6 @@ async function destinationChannel(client, selected) {
 	const channel = typeof selected.send === 'function' ? selected : await client.channels.fetch(selected.id);
 	if (!canReceive(channel)) return { error: 'That channel cannot receive messages.' };
 	return { channel };
-}
-
-async function copiedTracker(message) {
-	const files = [];
-
-	for (const attachment of message.attachments.values()) {
-		const response = await fetch(attachment.url);
-		if (!response.ok) throw new Error('Could not download the tracker.');
-		files.push(
-			new AttachmentBuilder(Buffer.from(await response.arrayBuffer()), {
-				name: attachment.name ?? TRACKER_FILE,
-			}),
-		);
-	}
-
-	const payload = {
-		files,
-		allowedMentions: { parse: [] },
-	};
-	if (message.content) payload.content = message.content;
-	return payload;
 }
 
 module.exports = {
@@ -100,12 +79,21 @@ module.exports = {
 		let payload;
 		try {
 			await enqueue(source.id, async () => {
-				const message = await findLatestTracker(source, interaction.client.user.id);
-				if (!message) {
-					payload = { error: 'No tracker in this channel.' };
+				const group = await findLatestTrackerGroup(source, interaction.client.user.id);
+				if (!group) {
+					payload = { error: 'No tracker in this channel.' }
 					return;
 				}
-				payload = await copiedTracker(message);
+
+				// The JSON file is always on the last message in the group
+				const anchorMessage = group.at(-1);
+				const tracker = await readTrackerMessage(anchorMessage);
+				if (!tracker) {
+					payload = { error: 'Those instructions did not match any tracker edits.' }
+					return;
+				}
+
+				payload = { tracker }
 			});
 		} catch (error) {
 			const content = sourceFailure(error);
@@ -121,7 +109,8 @@ module.exports = {
 
 		try {
 			await enqueue(target.channel.id, async () => {
-				await target.channel.send(payload);
+				await sendTrackerMessages(target.channel, payload.tracker, interaction);
+				return;
 			});
 		} catch (error) {
 			const content = destinationFailure(error);
@@ -129,7 +118,6 @@ module.exports = {
 			await interaction.editReply({ content });
 			return;
 		}
-
-		await interaction.editReply({ content: `Reposted the tracker to ${target.channel}.` });
+		await interaction.deleteReply();
 	},
 };
